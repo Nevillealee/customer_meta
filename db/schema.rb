@@ -26,7 +26,7 @@ ActiveRecord::Schema.define(version: 2018_05_07_233417) do
 
   create_table "customers", force: :cascade do |t|
     t.string "accepts_marketing"
-    t.jsonb "addresses", array: true
+    t.jsonb "addresses"
     t.string "default_address"
     t.string "email"
     t.string "first_name"
@@ -38,7 +38,7 @@ ActiveRecord::Schema.define(version: 2018_05_07_233417) do
     t.integer "orders_count"
     t.string "phone"
     t.string "state"
-    t.string "tags", array: true
+    t.string "tags"
     t.boolean "tax_exempt"
     t.string "total_spent"
     t.boolean "verified_email"

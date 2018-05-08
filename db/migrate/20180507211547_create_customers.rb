@@ -3,7 +3,7 @@ class CreateCustomers < ActiveRecord::Migration[5.2]
     create_table :customers, id: false do |t|
       t.bigint :id, primary_key: true
       t.string :accepts_marketing
-      t.jsonb :addresses, array: true
+      t.jsonb :addresses
       t.string :default_address
       t.string :email
       t.string :first_name
@@ -15,7 +15,7 @@ class CreateCustomers < ActiveRecord::Migration[5.2]
       t.integer :orders_count
       t.string :phone
       t.string :state
-      t.string :tags, array: true
+      t.string :tags
       t.boolean :tax_exempt
       t.string :total_spent
       t.boolean :verified_email
