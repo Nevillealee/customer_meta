@@ -1,12 +1,15 @@
 require 'dotenv/load'
+Dotenv.load
 require 'shopify_api'
 require 'httparty'
 require 'ruby-progressbar'
 require 'active_record'
+require 'recharge'
 Dir['./models/*.rb'].each {|file| require file }
 
 module CustomerAPI
   ACTIVE_CUSTOMER = []
+  RECHARGE_ARRAY = []
 
   def self.shopify_api_throttle
     ShopifyAPI::Base.site =
@@ -82,35 +85,78 @@ module CustomerAPI
   def self.pull_metafields
     ShopifyAPI::Base.site =
     "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
-    @customer_ids = Customer.pluck(:id, :first_name, :last_name, :email)
+    @customer_ids = InvalidCustomer.pluck(:shopify_customer_id)
     size = @customer_ids.size
     progressbar = ProgressBar.create(
     title: 'Progess',
     starting_at: 0,
     total: size,
     format: '%t: %p%%  |%B|')
+    puts @customer_ids[0]
 
-    puts size
-    @customer_ids.each do |cust|
+    @customer_ids.each do |current_id|
       current_meta = ShopifyAPI::Metafield.all(params:
         { resource: 'customers',
-          resource_id: cust[0],
-          fields: 'namespace, key, value, id, value_type'
+          resource_id: current_id,
+          fields: 'namespace, key, value'
         })
 
       current_meta.each do |x|
         if x.namespace == 'subscriptions' && x.key =='customer_string'
-          cust = CustomerMeta.create(
-            first: cust[1],
-            last: cust[2],
-            email: cust[3],
-            customer_string: x.value
-          )
+          cust = InvalidCustomer.find_by(shopify_customer_id: current_id)
+          cust.update(metafield_value: x.value)
         end
       end
       progressbar.increment
     end
   end
 
+    # customer_count = HTTParty.get("https://api.rechargeapps.com/customers/count", :headers => my_header)
+    # my_count = customer_count.parsed_response
+    # num_customers = my_count['count']
 
+  def self.save_recharge_customers
+    # cust = ReCharge::Customer.list(:page => 1, :limit => 1)
+    # puts cust[0].id
+    init_recharge
+    RECHARGE_ARRAY.each do |cust|
+      puts "saving #{cust.id}"
+      RechargeCustomer.create(
+        id: cust.id,
+        customer_hash: cust.hash,
+        shopify_customer_id: cust.shopify_customer_id,
+        email: cust.email,
+        created_at: cust.created_at,
+        updated_at: cust.updated_at,
+        first_name: cust.first_name,
+        last_name: cust.last_name,
+        billing_address1: cust.billing_address1,
+        billing_address2: cust.billing_address2,
+        billing_zip: cust.billing_zip,
+        billing_city: cust.billing_city,
+        billing_company: cust.billing_company,
+        billing_province: cust.billing_province,
+        billing_country: cust.billing_country,
+        billing_phone: cust.billing_phone,
+        processor_type: cust.processor_type,
+        status: cust.status
+      )
+    end
+  end
+
+  private
+  def self.init_recharge
+    ReCharge.api_key ="#{ENV['RECHARGE_ELLIE_TOKEN']}"
+    customer_count = Recharge::Customer.count
+    nb_pages = (customer_count / 250.0).ceil
+
+    1.upto(nb_pages) do |current_page| # throttling conditon
+      customers = ReCharge::Customer.list(:page => current_page, :limit => 250)
+      RECHARGE_ARRAY.push(customers)
+      p "recharge customer set #{current_page} loaded, sleeping 3"
+      sleep 3
+    end
+    p 'recharge customers initialized'
+    RECHARGE_ARRAY.flatten!
+  end
 end

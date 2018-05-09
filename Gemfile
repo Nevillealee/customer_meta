@@ -10,3 +10,4 @@ gem 'sinatra'
 gem "activesupport"
 gem 'pg', '~> 0.18.4'
 gem 'httparty'
+gem 'recharge-api'

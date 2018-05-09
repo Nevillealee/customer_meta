@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2018_05_07_233417) do
+ActiveRecord::Schema.define(version: 2018_05_09_182626) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -46,13 +46,35 @@ ActiveRecord::Schema.define(version: 2018_05_07_233417) do
     t.datetime "updated_at"
   end
 
-  create_table "metas", force: :cascade do |t|
-    t.string "first"
-    t.string "last"
+  create_table "invalid_customers", force: :cascade do |t|
+    t.string "subscription_id"
+    t.string "shopify_customer_id"
     t.string "email"
-    t.string "customer_string"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.string "metafield_value"
+    t.boolean "process", default: false
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "recharge_customers", force: :cascade do |t|
+    t.string "customer_hash"
+    t.string "shopify_customer_id"
+    t.string "email"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.string "first_name"
+    t.string "last_name"
+    t.string "billing_address1"
+    t.string "billing_address2"
+    t.string "billing_zip"
+    t.string "billing_city"
+    t.string "billing_company"
+    t.string "billing_province"
+    t.string "billing_country"
+    t.string "billing_phone"
+    t.string "processor_type"
+    t.string "status"
+    t.index ["shopify_customer_id"], name: "index_recharge_customers_on_shopify_customer_id"
   end
 
 end
