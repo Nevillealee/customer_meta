@@ -8,48 +8,24 @@ require 'recharge'
 Dir['./models/*.rb'].each {|file| require file }
 
 module CustomerAPI
-  ACTIVE_CUSTOMER = []
-  RECHARGE_ARRAY = []
+  SHOPIFY_CUSTOMERS = []
+  RECHARGE_CUSTOMERS = []
+  RECHARGE_SUBS = []
+  my_token = ENV['RECHARGE_ELLIE_TOKEN']
+  @my_header = {
+    "X-Recharge-Access-Token" => my_token
+  }
 
-  def self.shopify_api_throttle
-    ShopifyAPI::Base.site =
-      "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
-      return if ShopifyAPI.credit_left > 5
-      sleep 10
-  end
-
-  def self.init_actives
-    ShopifyAPI::Base.site =
-      "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
-    active_customer_count = ShopifyAPI::Customer.count
-    nb_pages = (active_customer_count / 250.0).ceil
-
-    puts active_customer_count
-
-    1.upto(nb_pages) do |page|
-      ellie_active_url =
-        "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin/customers.json?limit=250&page=#{page}"
-      @parsed_response = HTTParty.get(ellie_active_url)
-
-      ACTIVE_CUSTOMER.push(@parsed_response['customers'])
-      p "active customers set #{page} loaded, sleeping 3"
-      sleep 3
-    end
-    p 'active customers initialized'
-
-    ACTIVE_CUSTOMER.flatten!
-  end
-
-  def self.save_customers
-    init_actives
-    size = ACTIVE_CUSTOMER.size
+  def self.save_shopify_customers
+    init_shopify_customers
+    size = SHOPIFY_CUSTOMERS.size
     progressbar = ProgressBar.create(
     title: 'Progess',
     starting_at: 0,
     total: size,
     format: '%t: %p%%  |%B|')
 
-    ACTIVE_CUSTOMER.each do |current|
+    SHOPIFY_CUSTOMERS.each do |current|
       begin
         Customer.create(
         id: current['id'],
@@ -81,10 +57,11 @@ module CustomerAPI
     end
     p 'customers saved to db'
   end
-
+  # TODO(NL): rewrite pull_metafields function without InvalidCustomer table
   def self.pull_metafields
     ShopifyAPI::Base.site =
     "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
+    # came from csv of recharge customers who didnt have metafield_value
     @customer_ids = InvalidCustomer.pluck(:shopify_customer_id)
     size = @customer_ids.size
     progressbar = ProgressBar.create(
@@ -111,15 +88,12 @@ module CustomerAPI
     end
   end
 
-    # customer_count = HTTParty.get("https://api.rechargeapps.com/customers/count", :headers => my_header)
-    # my_count = customer_count.parsed_response
-    # num_customers = my_count['count']
-
   def self.save_recharge_customers
     # cust = ReCharge::Customer.list(:page => 1, :limit => 1)
     # puts cust[0].id
-    init_recharge
-    RECHARGE_ARRAY.each do |cust|
+    init_recharge_customers
+
+    RECHARGE_CUSTOMERS.each do |cust|
       puts "saving #{cust.id}"
       RechargeCustomer.create(
         id: cust.id,
@@ -142,21 +116,94 @@ module CustomerAPI
         status: cust.status
       )
     end
+    puts "recharge customers saved to db"
+  end
+
+  def self.save_recharge_subscriptions
+    init_recharge_subs
+    RECHARGE_SUBS.each do |s|
+      puts "saving #{s['id']}"
+      RechargeSubscription.create(
+        id: s['id'],
+        address_id: s['address_id'],
+        customer_id: s['customer_id'],
+        created_at: s['created_at'],
+        updated_at: s['updated_at'],
+        next_charge_scheduled_at: s['next_charge_scheduled_at'],
+        cancelled_at: s['cancelled_at'],
+        product_title: s['product_title'],
+        price: s['price'],
+        quantity: s['quantity'],
+        status: s['status'],
+        shopify_variant_id: s['shopify_variant_id'],
+        sku: s['sku'],
+        order_interval_frequency: s['order_interval_frequency'],
+        order_day_of_month: s['order_day_of_month'],
+        order_day_of_week: s['order_day_of_week'],
+        properties: s['properties'],
+        expire_after_specfic_number_of_charges: s['expire_after_specfic_number_of_charges']
+      )
+    end
+    puts "recharge subscriptions saved to db.."
   end
 
   private
-  def self.init_recharge
+  def self.shopify_api_throttle
+    ShopifyAPI::Base.site =
+      "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
+      return if ShopifyAPI.credit_left > 5
+      sleep 10
+  end
+  def self.init_recharge_customers
     ReCharge.api_key ="#{ENV['RECHARGE_ELLIE_TOKEN']}"
     customer_count = Recharge::Customer.count
     nb_pages = (customer_count / 250.0).ceil
 
     1.upto(nb_pages) do |current_page| # throttling conditon
       customers = ReCharge::Customer.list(:page => current_page, :limit => 250)
-      RECHARGE_ARRAY.push(customers)
-      p "recharge customer set #{current_page} loaded, sleeping 3"
-      sleep 3
+      RECHARGE_CUSTOMERS.push(customers)
+      p "recharge customer set #{current_page}/#{nb_pages} loaded"
+      # sleep 1
     end
     p 'recharge customers initialized'
-    RECHARGE_ARRAY.flatten!
+    RECHARGE_CUSTOMERS.flatten!
+  end
+  def self.init_shopify_customers
+    ShopifyAPI::Base.site =
+      "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin"
+    active_customer_count = ShopifyAPI::Customer.count
+    nb_pages = (active_customer_count / 250.0).ceil
+
+    puts active_customer_count
+
+    1.upto(nb_pages) do |page|
+      ellie_active_url =
+        "https://#{ENV['ACTIVE_API_KEY']}:#{ENV['ACTIVE_API_PW']}@#{ENV['ACTIVE_SHOP']}.myshopify.com/admin/customers.json?limit=250&page=#{page}"
+      @parsed_response = HTTParty.get(ellie_active_url)
+
+      SHOPIFY_CUSTOMERS.push(@parsed_response['customers'])
+      p "active customers set #{page} loaded, sleeping 3"
+      sleep 3
+    end
+    p 'active customers initialized'
+
+    SHOPIFY_CUSTOMERS.flatten!
+  end
+  def self.init_recharge_subs
+    response = HTTParty.get("https://api.rechargeapps.com/subscriptions/count", :headers => @my_header)
+    my_response = JSON.parse(response)
+    my_count = my_response['count'].to_i
+    nb_pages = (my_count / 250.0).ceil
+
+    1.upto(nb_pages) do |page|
+      subs =  HTTParty.get("https://api.rechargeapps.com/subscriptions?limit=250&page=#{page}", :headers => @my_header)
+      local_sub = subs['subscriptions']
+      local_sub.each do |s|
+        RECHARGE_SUBS.push(s)
+      end
+      p "recharge subscription set #{page}/#{nb_pages} loaded"
+      # sleep 1
+    end
+    p 'recharge subscriptions initialized'
   end
 end

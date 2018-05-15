@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2018_05_09_182626) do
+ActiveRecord::Schema.define(version: 2018_05_14_235444) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -75,6 +75,27 @@ ActiveRecord::Schema.define(version: 2018_05_09_182626) do
     t.string "processor_type"
     t.string "status"
     t.index ["shopify_customer_id"], name: "index_recharge_customers_on_shopify_customer_id"
+  end
+
+  create_table "recharge_subscriptions", force: :cascade do |t|
+    t.string "address_id"
+    t.string "customer_id"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.datetime "next_charge_scheduled_at"
+    t.datetime "cancelled_at"
+    t.string "product_title"
+    t.integer "price"
+    t.integer "quantity"
+    t.string "status"
+    t.string "shopify_variant_id"
+    t.string "sku"
+    t.string "order_interval_frequency"
+    t.integer "order_day_of_month"
+    t.integer "order_day_of_week"
+    t.jsonb "properties", array: true
+    t.integer "expire_after_specfic_number_of_charges"
+    t.index ["customer_id"], name: "index_recharge_subscriptions_on_customer_id"
   end
 
 end

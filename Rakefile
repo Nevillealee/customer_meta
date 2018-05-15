@@ -8,20 +8,29 @@ set :database_file, "config/database.yml"
 Dir['./models/*.rb'].each {|file| require file }
 require_relative 'script.rb'
 
-namespace :customer do
-  desc 'pull active customers down from shopify'
-  task :save_actives do
-    CustomerAPI.save_customers
+namespace :shopify do
+  desc 'pull shopify customers'
+  task :save_customers do
+    CustomerAPI.save_shopify_customers
   end
 
-  desc 'pull down all customer metafields'
-  task :pull_meta do\
+  desc 'pull customer metafields'
+  task :pull_metas do
     CustomerAPI.pull_metafields
   end
+end
 
-  desc 'pull down all recharge customer'
-  task :pull_recharge_customers do\
+namespace :recharge do
+  desc 'pull recharge customers'
+  task :save_customers do
+    ActiveRecord::Base.connection.execute("TRUNCATE recharge_customers;")
     CustomerAPI.save_recharge_customers
+  end
+
+  desc 'pull recharge subs'
+  task :save_subs do
+    ActiveRecord::Base.connection.execute("TRUNCATE recharge_subscriptions;") if RechargeSubscription.exists?
+    CustomerAPI.save_recharge_subscriptions
   end
 end
 
