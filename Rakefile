@@ -9,14 +9,26 @@ Dir['./models/*.rb'].each {|file| require file }
 require_relative 'script.rb'
 
 namespace :shopify do
+  desc 'tags recurring orders with "3month_nocharge"'
+  task :tag_orders do
+    CustomerAPI.tag_orders
+  end
+
   desc 'pull shopify customers'
   task :save_customers do
+    ActiveRecord::Base.connection.execute("TRUNCATE customers;") if Customer.exists?
     CustomerAPI.save_shopify_customers
   end
 
   desc 'pull customer metafields'
   task :pull_metas do
     CustomerAPI.pull_metafields
+  end
+
+  desc 'pull shopify orders'
+  task :save_orders do
+    ActiveRecord::Base.connection.execute("TRUNCATE shopify_orders;") if ShopifyOrder.exists?
+    CustomerAPI.save_shopify_orders
   end
 end
 
